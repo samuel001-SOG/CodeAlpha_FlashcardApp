@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Flashcard Quiz App — CodeAlpha</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { min-height: 100vh; background: #07080f; color: #e0e0f0; font-family: 'Cormorant Garamond', Georgia, serif; overflow-x: hidden; }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-thumb { background: #2a2c42; border-radius: 9px; }
+
+    /* ── NAVBAR ── */
+    .navbar {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 20px 28px; border-bottom: 1px solid #161728;
+      position: sticky; top: 0; background: #07080f; z-index: 100;
+    }
+    .nav-brand { cursor: pointer; }
+    .nav-brand-sub { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 4px; color: #6366f1; text-transform: uppercase; }
+    .nav-brand-title { font-family: 'Cormorant Garamond', serif; font-weight: 700; font-size: 20px; color: #fff; letter-spacing: -0.5px; margin-top: 2px; }
+    .nav-btns { display: flex; gap: 8px; }
+    .nav-btn { padding: 7px 16px; border-radius: 100px; font-size: 11px; font-family: 'JetBrains Mono', monospace; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; transition: all 0.2s; border: 1px solid #1a1c2e; background: transparent; color: #444; }
+    .nav-btn.active { background: #6366f1; border-color: #6366f1; color: #fff; }
+    .nav-btn:hover:not(.active) { color: #888; border-color: #333; }
+
+    /* ── SCREENS ── */
+    .screen { display: none; }
+    .screen.active { display: block; }
+
+    /* ── TOAST ── */
+    .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-12px);
+      background: #131425; border: 1px solid #2a2c42; border-radius: 100px;
+      padding: 10px 24px; font-size: 13px; font-family: monospace; color: #a0a0c0;
+      z-index: 999; opacity: 0; pointer-events: none; white-space: nowrap;
+      transition: opacity 0.3s ease, transform 0.3s ease; }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ── HOME ── */
+    #screen-home { padding: 48px 28px; max-width: 960px; margin: 0 auto; }
+    .home-hero { margin-bottom: 40px; }
+    .home-title { font-family: 'Cormorant Garamond', serif; font-weight: 700;
+      font-size: clamp(36px,6vw,64px); letter-spacing: -2px; color: #fff; line-height: 1.1; margin-bottom: 12px; }
+    .home-title em { font-style: italic; color: #6366f1; }
+    .home-meta { color: #444; font-size: 14px; font-family: monospace; }
+    .deck-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+    .deck-card { background: #0d0e1b; border-radius: 20px; padding: 24px 22px;
+      cursor: pointer; transition: all 0.22s ease; border: 1px solid transparent; }
+    .deck-card:hover { transform: translateY(-4px); box-shadow: 0 20px 48px rgba(0,0,0,0.5); }
+    .deck-emoji { font-size: 32px; margin-bottom: 12px; }
+    .deck-name { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 20px; color: #fff; margin-bottom: 6px; }
+    .deck-desc { font-size: 12px; color: #444; margin-bottom: 16px; font-style: italic; }
+    .deck-footer { display: flex; justify-content: space-between; align-items: center; }
+    .deck-count { padding: 4px 12px; border-radius: 100px; font-size: 11px; font-family: monospace; border: 1px solid; }
+    .deck-cta { font-size: 12px; color: #6366f1; font-family: monospace; }
+
+    /* ── STUDY ── */
+    #screen-study { display: flex; flex-direction: column; align-items: center; padding: 40px 24px 60px; max-width: 760px; margin: 0 auto; }
+    .study-topbar { width: 100%; display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px; }
+    .back-link { background: none; border: none; color: #444; cursor: pointer; font-family: monospace; font-size: 11px; }
+    .score-pills { display: flex; gap: 8px; }
+    .score-pill { padding: 5px 14px; border-radius: 100px; font-size: 11px; font-family: monospace; border: 1px solid; }
+    .deck-label { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+    .deck-label-name { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 18px; }
+
+    .progress-bar-wrap { width: 100%; margin-bottom: 28px; }
+    .progress-meta { display: flex; justify-content: space-between; font-size: 11px; color: #333; font-family: monospace; margin-bottom: 8px; }
+    .progress-bar-bg { height: 3px; background: #161728; border-radius: 9px; }
+    .progress-bar-fill { height: 100%; border-radius: 9px; transition: width 0.4s ease; }
+
+    .flashcard { width: 100%; min-height: 260px; background: #0d0e1b;
+      border-radius: 24px; padding: 48px 44px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      cursor: pointer; user-select: none; position: relative;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+      transition: opacity 0.23s ease, transform 0.23s ease, border-color 0.3s; }
+    .flashcard.animout { opacity: 0; transform: scale(0.96); }
+    .flashcard-hint { position: absolute; top: 18px; right: 22px; font-size: 10px;
+      font-family: monospace; color: #2a2c42; letter-spacing: 2px; text-transform: uppercase; }
+    .flashcard-dot { position: absolute; top: 18px; left: 22px; width: 10px; height: 10px;
+      border-radius: 50%; display: none; }
+    .flashcard.flipped .flashcard-dot { display: block; }
+    .flashcard-text { font-size: clamp(17px,2.8vw,22px); line-height: 1.65;
+      text-align: center; transition: color 0.3s; }
+
+    .show-answer-btn { margin-top: 20px; padding: 10px 28px; background: transparent;
+      border-radius: 100px; font-size: 12px; font-family: monospace; letter-spacing: 2px;
+      text-transform: uppercase; cursor: pointer; transition: all 0.2s; }
+    .study-nav { display: flex; gap: 10px; margin-top: 24px; flex-wrap: wrap; justify-content: center; }
+    .nav-action-btn { padding: 10px 20px; border-radius: 100px; font-size: 12px;
+      font-family: monospace; cursor: pointer; border: 1px solid; transition: all 0.2s; }
+    .nav-action-btn:hover { transform: translateY(-1px); opacity: 0.82; }
+
+    /* ── MANAGE ── */
+    #screen-manage { padding: 40px 28px; max-width: 760px; margin: 0 auto; }
+    .manage-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px; }
+    .manage-title { font-family: 'Cormorant Garamond', serif; font-weight: 700; font-size: 32px; color: #fff; }
+    .add-card-btn { padding: 10px 22px; background: #6366f1; border: none; border-radius: 100px; color: #fff; font-size: 12px; font-family: monospace; letter-spacing: 1px; cursor: pointer; transition: all 0.2s; }
+    .add-card-btn:hover { opacity: 0.85; transform: translateY(-1px); }
+    .filter-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 24px; }
+    .filter-btn { padding: 5px 14px; border-radius: 100px; font-size: 11px; font-family: monospace; cursor: pointer; transition: all 0.2s; border: 1px solid #1a1c2e; background: transparent; color: #444; }
+    .filter-btn.active { background: #6366f1; border-color: #6366f1; color: #fff; }
+    .cards-list { display: flex; flex-direction: column; gap: 10px; }
+    .card-row { background: #0d0e1b; border: 1px solid #161728; border-radius: 14px; padding: 16px 20px; display: flex; gap: 14px; align-items: flex-start; }
+    .card-row-content { flex: 1; }
+    .card-row-q { font-size: 12px; font-family: monospace; margin-bottom: 4px; }
+    .card-row-a { font-size: 12px; color: #444; font-style: italic; }
+    .card-row-deck { font-size: 10px; color: #2a2c42; margin-top: 6px; font-family: monospace; }
+    .card-row-btns { display: flex; gap: 6px; flex-shrink: 0; }
+    .edit-btn { background: #131425; border: 1px solid #1a1c2e; border-radius: 8px; color: #666; padding: 5px 12px; cursor: pointer; font-size: 11px; font-family: monospace; transition: all 0.2s; }
+    .del-btn { background: #1a0505; border: 1px solid rgba(239,68,68,0.35); border-radius: 8px; color: #ef4444; padding: 5px 12px; cursor: pointer; font-size: 11px; font-family: monospace; transition: all 0.2s; }
+    .edit-btn:hover, .del-btn:hover { transform: translateY(-1px); }
+    .empty-state { text-align: center; padding: 80px 20px; color: #333; }
+    .empty-icon { font-size: 48px; margin-bottom: 12px; }
+
+    /* ── FORM ── */
+    #screen-form { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 80vh; padding: 48px 24px; }
+    .form-card { width: 100%; max-width: 520px; background: #0d0e1b; border: 1px solid #1a1c2e; border-radius: 24px; padding: 36px 32px; }
+    .form-title { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 26px; color: #fff; margin-bottom: 28px; }
+    .form-label { font-size: 11px; color: #444; font-family: monospace; letter-spacing: 1px; text-transform: uppercase; display: block; margin-bottom: 8px; }
+    .deck-select-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 22px; }
+    .deck-sel-btn { padding: 5px 12px; border-radius: 100px; font-size: 11px; font-family: monospace; cursor: pointer; transition: all 0.2s; border: 1px solid #1a1c2e; background: transparent; color: #444; }
+    textarea { width: 100%; background: #07080f; border: 1px solid #1a1c2e; border-radius: 10px; color: #e0e0f0; padding: 12px 14px; font-size: 14px; font-family: 'Cormorant Garamond', serif; resize: vertical; outline: none; line-height: 1.5; }
+    textarea:focus { border-color: #6366f1; }
+    .form-q { margin-bottom: 20px; }
+    .form-a { margin-bottom: 28px; }
+    .form-footer { display: flex; gap: 10px; justify-content: flex-end; }
+    .cancel-btn { padding: 10px 20px; background: transparent; border: 1px solid #1a1c2e; border-radius: 100px; color: #444; cursor: pointer; font-size: 12px; font-family: monospace; transition: all 0.2s; }
+    .save-form-btn { padding: 10px 26px; background: #6366f1; border: none; border-radius: 100px; color: #fff; cursor: pointer; font-size: 12px; font-family: monospace; letter-spacing: 1px; transition: all 0.2s; }
+    .cancel-btn:hover, .save-form-btn:hover { transform: translateY(-1px); opacity: 0.85; }
+
+    @keyframes float { 0%,100%{ transform: translateY(0); } 50%{ transform: translateY(-8px); } }
+  </style>
+</head>
+<body>
+
+  <div class="toast" id="toast"></div>
+
+  <!-- NAVBAR -->
+  <nav class="navbar">
+    <div class="nav-brand" onclick="goScreen('home')">
+      <div class="nav-brand-sub">CodeAlpha · Task 01</div>
+      <div class="nav-brand-title">Flashcard Quiz</div>
+    </div>
+    <div class="nav-btns">
+      <button class="nav-btn active" id="nav-home" onclick="goScreen('home')">Home</button>
+      <button class="nav-btn" id="nav-study" onclick="if(state.activeDeck)goScreen('study')">Study</button>
+      <button class="nav-btn" id="nav-manage" onclick="goScreen('manage')">Manage</button>
+    </div>
+  </nav>
+
+  <!-- HOME -->
+  <div id="screen-home" class="screen active">
+    <div class="home-hero">
+      <h1 class="home-title">Choose a<br><em>Deck to Study</em></h1>
+      <p class="home-meta" id="home-meta"></p>
+    </div>
+    <div class="deck-grid" id="deck-grid"></div>
+  </div>
+
+  <!-- STUDY -->
+  <div id="screen-study" class="screen">
+    <div class="study-topbar">
+      <button class="back-link" onclick="goScreen('home')">← Decks</button>
+      <div class="score-pills">
+        <div class="score-pill" id="score-got" style="background:#0d2e1a;border-color:rgba(34,197,94,0.35);color:#22c55e">✓ 0</div>
+        <div class="score-pill" id="score-review" style="background:#1a1205;border-color:rgba(245,158,11,0.35);color:#f59e0b">📌 0</div>
+      </div>
+    </div>
+    <div class="deck-label" id="deck-label"></div>
+    <div class="progress-bar-wrap">
+      <div class="progress-meta">
+        <span id="card-counter">Card 1 / 1</span>
+        <span id="card-pct">0%</span>
+      </div>
+      <div class="progress-bar-bg"><div class="progress-bar-fill" id="progress-fill" style="width:0%"></div></div>
+    </div>
+    <div class="flashcard" id="flashcard" onclick="flipCard()">
+      <div class="flashcard-hint" id="card-hint">Question · tap to flip</div>
+      <div class="flashcard-dot" id="card-dot"></div>
+      <p class="flashcard-text" id="card-text"></p>
+    </div>
+    <button class="show-answer-btn" id="show-answer-btn" onclick="flipCard()">Show Answer</button>
+    <div class="study-nav" id="study-nav">
+      <button class="nav-action-btn" style="background:#131425;border-color:#1a1c2e;color:#555" onclick="navigate(-1)">← Prev</button>
+      <button class="nav-action-btn" id="btn-learning" style="display:none;background:#1a0f05;border-color:rgba(245,158,11,0.35);color:#f59e0b" onclick="markLearning()">Still Learning</button>
+      <button class="nav-action-btn" id="btn-got" style="display:none;background:#051a0a;border-color:rgba(34,197,94,0.35);color:#22c55e" onclick="markGot()">Got It ✓</button>
+      <button class="nav-action-btn" style="background:#131425;border-color:#1a1c2e;color:#555" onclick="navigate(1)">Next →</button>
+    </div>
+  </div>
+
+  <!-- MANAGE -->
+  <div id="screen-manage" class="screen">
+    <div class="manage-header">
+      <h2 class="manage-title">Manage Cards</h2>
+      <button class="add-card-btn" onclick="openForm(null,null)">+ Add Card</button>
+    </div>
+    <div class="filter-row" id="filter-row"></div>
+    <div id="cards-list-wrap"></div>
+  </div>
+
+  <!-- FORM -->
+  <div id="screen-form" class="screen">
+    <div class="form-card">
+      <h2 class="form-title" id="form-title">New Card</h2>
+      <label class="form-label">Add to Deck</label>
+      <div class="deck-select-row" id="deck-select-row"></div>
+      <label class="form-label">Question</label>
+      <textarea id="form-q" class="form-q" rows="3" placeholder="Enter your question..."></textarea>
+      <label class="form-label">Answer</label>
+      <textarea id="form-a" class="form-a" rows="3" placeholder="Enter the answer..."></textarea>
+      <div class="form-footer">
+        <button class="cancel-btn" onclick="goScreen('manage')">Cancel</button>
+        <button class="save-form-btn" onclick="saveCard()">Save Card</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+// ─── DECK DATA ────────────────────────────────────────────────────────────────
+const DECKS_DATA = {
+  geography: {
+    label: "World Geography", emoji: "🌍", color: "#22c55e",
+    description: "Capitals, countries, and continents",
+    cards: [
+      { q:"What is the capital of France?", a:"Paris" },
+      { q:"What is the capital of Japan?", a:"Tokyo" },
+      { q:"What is the capital of Australia?", a:"Canberra" },
+      { q:"What is the largest continent by area?", a:"Asia" },
+      { q:"What is the longest river in the world?", a:"The Nile (6,650 km)" },
+      { q:"What is the smallest country in the world?", a:"Vatican City" },
+      { q:"What is the capital of Brazil?", a:"Brasília" },
+      { q:"What is the tallest mountain in the world?", a:"Mount Everest (8,849 m)" },
+      { q:"What ocean is the largest?", a:"The Pacific Ocean" },
+      { q:"What is the capital of Canada?", a:"Ottawa" },
+      { q:"Which country has the most natural lakes?", a:"Canada" },
+      { q:"What is the capital of Nigeria?", a:"Abuja" },
+      { q:"What is the capital of Egypt?", a:"Cairo" },
+      { q:"What is the driest desert in the world?", a:"The Atacama Desert" },
+      { q:"What is the capital of Germany?", a:"Berlin" },
+      { q:"Which continent is the least populated?", a:"Antarctica (no permanent residents)" },
+      { q:"What is the capital of Argentina?", a:"Buenos Aires" },
+      { q:"What is the deepest lake in the world?", a:"Lake Baikal (Russia)" },
+      { q:"What is the capital of China?", a:"Beijing" },
+      { q:"What two countries share the longest border?", a:"USA and Canada" },
+      { q:"What is the capital of India?", a:"New Delhi" },
+      { q:"What is the Amazon Rainforest primarily located in?", a:"Brazil" },
+      { q:"What is the capital of Russia?", a:"Moscow" },
+      { q:"What is the capital of South Africa?", a:"Pretoria (executive), Cape Town (legislative)" },
+      { q:"Which country is both a continent and a country?", a:"Australia" },
+    ]
+  },
+  science: {
+    label: "Science & Nature", emoji: "🔬", color: "#6366f1",
+    description: "Physics, chemistry, biology and more",
+    cards: [
+      { q:"What is the chemical symbol for Gold?", a:"Au" },
+      { q:"What planet is known as the Red Planet?", a:"Mars" },
+      { q:"How many bones are in the adult human body?", a:"206 bones" },
+      { q:"What is the speed of light?", a:"299,792,458 metres per second" },
+      { q:"What is the powerhouse of the cell?", a:"The mitochondria" },
+      { q:"What is the atomic number of Carbon?", a:"6" },
+      { q:"What gas do plants absorb during photosynthesis?", a:"Carbon dioxide (CO₂)" },
+      { q:"What is the most abundant gas in Earth's atmosphere?", a:"Nitrogen (78%)" },
+      { q:"What force keeps planets in orbit around the Sun?", a:"Gravity" },
+      { q:"What is the chemical formula for water?", a:"H₂O" },
+      { q:"How many chromosomes do humans have?", a:"46 (23 pairs)" },
+      { q:"What is the hardest natural substance on Earth?", a:"Diamond" },
+      { q:"What is the process by which plants make food from sunlight?", a:"Photosynthesis" },
+      { q:"What is DNA short for?", a:"Deoxyribonucleic Acid" },
+      { q:"What is the nearest star to Earth?", a:"The Sun" },
+      { q:"What type of energy does the Sun primarily produce?", a:"Nuclear fusion energy" },
+      { q:"What is the chemical symbol for Iron?", a:"Fe" },
+      { q:"What organ pumps blood through the human body?", a:"The heart" },
+      { q:"What is the smallest unit of matter?", a:"An atom" },
+      { q:"What is Newton's First Law of Motion?", a:"An object at rest stays at rest; an object in motion stays in motion unless acted on by an external force." },
+      { q:"What is the boiling point of water in Celsius?", a:"100°C" },
+      { q:"What vitamin does the Sun provide to humans?", a:"Vitamin D" },
+      { q:"How many chambers does the human heart have?", a:"Four" },
+      { q:"What is the chemical symbol for Sodium?", a:"Na" },
+      { q:"What planet is closest to the Sun?", a:"Mercury" },
+    ]
+  },
+  history: {
+    label: "World History", emoji: "📜", color: "#f59e0b",
+    description: "Events, figures and civilizations",
+    cards: [
+      { q:"Who wrote 'Romeo and Juliet'?", a:"William Shakespeare" },
+      { q:"In what year did World War II end?", a:"1945" },
+      { q:"Who was the first President of the United States?", a:"George Washington" },
+      { q:"What ancient wonder was located in Alexandria, Egypt?", a:"The Lighthouse of Alexandria" },
+      { q:"What was the name of the ship that sank in 1912?", a:"The RMS Titanic" },
+      { q:"Who painted the Mona Lisa?", a:"Leonardo da Vinci" },
+      { q:"In which year did the French Revolution begin?", a:"1789" },
+      { q:"Who was the first person to walk on the Moon?", a:"Neil Armstrong (1969)" },
+      { q:"What wall was torn down in 1989?", a:"The Berlin Wall" },
+      { q:"Who was Cleopatra?", a:"The last active ruler of the Ptolemaic Kingdom of Egypt" },
+      { q:"What civilization built the pyramids at Giza?", a:"The ancient Egyptians" },
+      { q:"Who led the Indian independence movement against British rule?", a:"Mahatma Gandhi" },
+      { q:"What was the Cold War?", a:"A period of geopolitical tension between the USA and USSR (1947–1991)" },
+      { q:"Who invented the telephone?", a:"Alexander Graham Bell (1876)" },
+      { q:"In which year did Nelson Mandela become President of South Africa?", a:"1994" },
+      { q:"What was the name of the first artificial satellite launched into space?", a:"Sputnik 1 (1957, by the USSR)" },
+      { q:"Who was the first female Prime Minister of the UK?", a:"Margaret Thatcher (1979)" },
+      { q:"What was the Black Death?", a:"A deadly bubonic plague that killed millions in 14th century Europe" },
+      { q:"What event triggered World War I?", a:"The assassination of Archduke Franz Ferdinand in 1914" },
+      { q:"What was apartheid?", a:"A system of racial segregation in South Africa (1948–1994)" },
+      { q:"Who invented the printing press?", a:"Johannes Gutenberg (around 1440)" },
+      { q:"Who was Napoleon Bonaparte?", a:"A French military leader who became Emperor of France" },
+      { q:"What was the Renaissance?", a:"A cultural and intellectual movement in Europe (14th–17th centuries)" },
+      { q:"Who discovered America in 1492?", a:"Christopher Columbus" },
+      { q:"What empire was Julius Caesar part of?", a:"The Roman Empire" },
+    ]
+  },
+  maths: {
+    label: "Mathematics", emoji: "📐", color: "#ef4444",
+    description: "Numbers, formulas and logic",
+    cards: [
+      { q:"What is 12 × 12?", a:"144" },
+      { q:"What is the value of π (pi) to 5 decimal places?", a:"3.14159" },
+      { q:"What is the square root of 144?", a:"12" },
+      { q:"What is the formula for the area of a circle?", a:"A = πr²" },
+      { q:"What is a prime number?", a:"A number greater than 1 with no divisors other than 1 and itself" },
+      { q:"What is 15% of 200?", a:"30" },
+      { q:"What is the Pythagorean theorem?", a:"a² + b² = c² (where c is the hypotenuse)" },
+      { q:"What is the formula for the circumference of a circle?", a:"C = 2πr" },
+      { q:"What is the derivative of x²?", a:"2x" },
+      { q:"What is 7 factorial (7!)?", a:"5,040" },
+      { q:"What is the sum of angles in a triangle?", a:"180 degrees" },
+      { q:"What is the formula for the volume of a sphere?", a:"V = (4/3)πr³" },
+      { q:"What is the slope-intercept form of a linear equation?", a:"y = mx + b" },
+      { q:"What is the quadratic formula?", a:"x = (−b ± √(b²−4ac)) / 2a" },
+      { q:"What is 2⁸?", a:"256" },
+      { q:"What is a right angle?", a:"An angle of exactly 90 degrees" },
+      { q:"What are parallel lines?", a:"Lines in the same plane that never intersect" },
+      { q:"What is the formula for simple interest?", a:"I = P × R × T (Principal × Rate × Time)" },
+      { q:"What is the result of any number raised to the power of 0?", a:"1 (e.g., 5⁰ = 1)" },
+      { q:"What is the formula for the area of a rectangle?", a:"A = length × width" },
+      { q:"What does BODMAS stand for?", a:"Brackets, Orders, Division, Multiplication, Addition, Subtraction" },
+      { q:"What is a rational number?", a:"A number expressible as a fraction p/q where p and q are integers" },
+      { q:"What is an irrational number? Give an example.", a:"A number that cannot be expressed as a fraction. Example: √2, π" },
+      { q:"What is the mean of: 4, 8, 6, 5, 3, 2, 8, 9, 2, 5?", a:"5.2" },
+      { q:"What is a 3-4-5 triangle?", a:"A right-angled triangle with sides 3, 4 and 5 — a Pythagorean triple" },
+    ]
+  },
+  technology: {
+    label: "Technology & CS", emoji: "💻", color: "#06b6d4",
+    description: "Computing, internet, and programming",
+    cards: [
+      { q:"What does CPU stand for?", a:"Central Processing Unit" },
+      { q:"What does HTML stand for?", a:"HyperText Markup Language" },
+      { q:"What is the binary representation of decimal 10?", a:"1010" },
+      { q:"What does HTTP stand for?", a:"HyperText Transfer Protocol" },
+      { q:"Who are the founders of Microsoft?", a:"Bill Gates and Paul Allen" },
+      { q:"What does RAM stand for?", a:"Random Access Memory" },
+      { q:"What is an algorithm?", a:"A step-by-step procedure for solving a problem" },
+      { q:"What language is primarily used for styling web pages?", a:"CSS (Cascading Style Sheets)" },
+      { q:"What does API stand for?", a:"Application Programming Interface" },
+      { q:"What is the purpose of a firewall?", a:"To monitor and control network traffic based on security rules" },
+      { q:"What does URL stand for?", a:"Uniform Resource Locator" },
+      { q:"What programming language was created by Guido van Rossum?", a:"Python" },
+      { q:"What is the difference between RAM and ROM?", a:"RAM is temporary volatile memory; ROM is permanent non-volatile memory" },
+      { q:"What does SQL stand for?", a:"Structured Query Language" },
+      { q:"Who founded Apple Inc.?", a:"Steve Jobs, Steve Wozniak, and Ronald Wayne" },
+      { q:"What is a 'bug' in programming?", a:"An error or flaw in software causing incorrect behavior" },
+      { q:"What does IP stand for in networking?", a:"Internet Protocol" },
+      { q:"What is open-source software?", a:"Software whose source code is freely available for anyone to view, modify, and distribute" },
+      { q:"What is a loop in programming?", a:"A sequence of instructions repeated until a condition is met" },
+      { q:"What is the full form of Wi-Fi?", a:"Wireless Fidelity" },
+      { q:"What is a boolean data type?", a:"A data type with only two values: true or false" },
+      { q:"What does 'debugging' mean?", a:"The process of finding and fixing errors in code" },
+      { q:"What is cloud computing?", a:"Delivery of computing services over the internet" },
+      { q:"What is the difference between a compiler and an interpreter?", a:"A compiler translates entire code before execution; an interpreter translates line by line" },
+      { q:"What is the function of an operating system?", a:"To manage hardware resources and provide services for applications" },
+    ]
+  },
+  language: {
+    label: "English Language", emoji: "📚", color: "#ec4899",
+    description: "Grammar, vocabulary and literary terms",
+    cards: [
+      { q:"What is a noun?", a:"A word that names a person, place, thing, or idea" },
+      { q:"What is a metaphor?", a:"A figure of speech saying something IS something else (e.g., 'Time is money')" },
+      { q:"What is an adjective?", a:"A word that describes or modifies a noun" },
+      { q:"What is onomatopoeia?", a:"A word that phonetically imitates the sound it describes (e.g., buzz, sizzle)" },
+      { q:"Difference between 'there', 'their', and 'they're'?", a:"'There' = place; 'Their' = possession; 'They're' = they are" },
+      { q:"What is an oxymoron?", a:"A figure of speech with contradictory terms (e.g., 'deafening silence')" },
+      { q:"What is a simile?", a:"A comparison using 'like' or 'as' (e.g., 'fast as lightning')" },
+      { q:"What is an adverb?", a:"A word that modifies a verb, adjective, or another adverb" },
+      { q:"What is alliteration?", a:"Repetition of the same consonant at the beginning of nearby words" },
+      { q:"What is a synonym?", a:"A word with the same or similar meaning as another word" },
+      { q:"What is an antonym?", a:"A word with the opposite meaning of another word" },
+      { q:"What is a clause?", a:"A group of words containing a subject and predicate" },
+      { q:"What is personification?", a:"Giving human qualities to non-human things" },
+      { q:"What is a conjunction?", a:"A word used to connect clauses or sentences (e.g., and, but, or, because)" },
+      { q:"What is the difference between active and passive voice?", a:"Active: subject performs action. Passive: subject receives action." },
+      { q:"What is irony?", a:"When the actual meaning is the opposite of the literal meaning" },
+      { q:"What is a pronoun?", a:"A word that replaces a noun (e.g., he, she, it, they)" },
+      { q:"What is a hyperbole?", a:"An extreme exaggeration for emphasis (e.g., 'I'm so hungry I could eat a horse')" },
+      { q:"What is the Oxford comma?", a:"A comma placed before the conjunction in a list" },
+      { q:"What is a preposition?", a:"A word showing relationship between a noun and other words (e.g., in, on, under)" },
+      { q:"What is foreshadowing in literature?", a:"A hint or clue about what will happen later in the story" },
+      { q:"What is the plot of a story?", a:"The sequence of events: exposition, rising action, climax, falling action, resolution" },
+      { q:"What is a verb?", a:"An action, occurrence, or state of being word (e.g., run, think, is)" },
+      { q:"What is third-person omniscient narration?", a:"A narrator who knows the thoughts and feelings of all characters" },
+      { q:"What is a paragraph?", a:"A distinct section of writing dealing with one point, begun on a new indented line" },
+    ]
+  }
+};
+
+const DECK_KEYS = Object.keys(DECKS_DATA);
+
+// ─── STATE ────────────────────────────────────────────────────────────────────
+const state = {
+  activeDeck: null,
+  cardIdx: 0,
+  flipped: false,
+  score: { got: 0, review: 0 },
+  customCards: {},
+  formDeck: DECK_KEYS[0],
+  formEditDeckKey: null,
+  formEditIdx: null,
+  filterDeck: null,
+  animOut: false
+};
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 2200);
+}
+
+function getDeckCards(key) {
+  return [...(DECKS_DATA[key]?.cards || []), ...(state.customCards[key] || [])];
+}
+
+function getTotalCards() {
+  return DECK_KEYS.reduce((a, k) => a + getDeckCards(k).length, 0);
+}
+
+function getTotalCustom() {
+  return Object.values(state.customCards).reduce((a, c) => a + c.length, 0);
+}
+
+function goScreen(id) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.getElementById("screen-" + id).classList.add("active");
+  document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+  const nb = document.getElementById("nav-" + id);
+  if (nb) nb.classList.add("active");
+  if (id === "home") renderHome();
+  if (id === "manage") renderManage();
+}
+
+// ─── HOME ─────────────────────────────────────────────────────────────────────
+function renderHome() {
+  document.getElementById("home-meta").textContent =
+    `${getTotalCards()} total cards across ${DECK_KEYS.length} decks · ${getTotalCustom()} custom cards added`;
+  const grid = document.getElementById("deck-grid");
+  grid.innerHTML = "";
+  DECK_KEYS.forEach(key => {
+    const d = DECKS_DATA[key];
+    const count = getDeckCards(key).length;
+    const card = document.createElement("div");
+    card.className = "deck-card";
+    card.style.border = `1px solid ${d.color}25`;
+    card.style.boxShadow = `0 4px 20px rgba(0,0,0,0.3), 0 0 0 1px ${d.color}08`;
+    card.innerHTML = `
+      <div class="deck-emoji">${d.emoji}</div>
+      <div class="deck-name">${d.label}</div>
+      <div class="deck-desc">${d.description}</div>
+      <div class="deck-footer">
+        <div class="deck-count" style="color:${d.color};border-color:${d.color}35;background:${d.color}15">${count} cards</div>
+        <div class="deck-cta">Study →</div>
+      </div>`;
+    card.onclick = () => startDeck(key);
+    grid.appendChild(card);
+  });
+}
+
+// ─── STUDY ───────────────────────────────────────────────────────────────────
+function startDeck(key) {
+  state.activeDeck = key;
+  state.cardIdx = 0;
+  state.flipped = false;
+  state.score = { got: 0, review: 0 };
+  renderStudy();
+  goScreen("study");
+}
+
+function renderStudy() {
+  const key = state.activeDeck;
+  const d = DECKS_DATA[key];
+  const cards = getDeckCards(key);
+  const card = cards[state.cardIdx];
+  if (!card) return;
+  const progress = ((state.cardIdx + 1) / cards.length) * 100;
+
+  // deck label
+  document.getElementById("deck-label").innerHTML =
+    `<span style="font-size:20px">${d.emoji}</span><span class="deck-label-name" style="color:${d.color}">${d.label}</span>`;
+
+  // progress
+  document.getElementById("card-counter").textContent = `Card ${state.cardIdx + 1} / ${cards.length}`;
+  document.getElementById("card-pct").textContent = `${Math.round(progress)}%`;
+  document.getElementById("progress-fill").style.width = `${progress}%`;
+  document.getElementById("progress-fill").style.background = `linear-gradient(90deg,${d.color},${d.color}99)`;
+
+  // card
+  const fc = document.getElementById("flashcard");
+  fc.style.border = `1px solid ${state.flipped ? d.color + "40" : "#1a1c2e"}`;
+  fc.style.boxShadow = `0 24px 64px rgba(0,0,0,0.5), 0 0 0 1px ${state.flipped ? d.color : "#000"}15`;
+  document.getElementById("card-hint").textContent = `${state.flipped ? "Answer" : "Question"} · tap to flip`;
+  document.getElementById("card-dot").style.background = d.color;
+  const ct = document.getElementById("card-text");
+  ct.textContent = state.flipped ? card.a : card.q;
+  ct.style.color = state.flipped ? d.color : "#ddddf0";
+  ct.style.fontStyle = state.flipped ? "italic" : "normal";
+  if (state.flipped) fc.classList.add("flipped"); else fc.classList.remove("flipped");
+
+  // show answer btn
+  document.getElementById("show-answer-btn").style.display = state.flipped ? "none" : "inline-block";
+  document.getElementById("show-answer-btn").style.color = d.color;
+  document.getElementById("show-answer-btn").style.border = `1px solid ${d.color}50`;
+
+  // mark buttons
+  document.getElementById("btn-learning").style.display = state.flipped ? "inline-block" : "none";
+  document.getElementById("btn-got").style.display = state.flipped ? "inline-block" : "none";
+
+  // score
+  document.getElementById("score-got").textContent = `✓ ${state.score.got}`;
+  document.getElementById("score-review").textContent = `📌 ${state.score.review}`;
+}
+
+function flipCard() { state.flipped = !state.flipped; renderStudy(); }
+
+function navigate(dir) {
+  const fc = document.getElementById("flashcard");
+  fc.classList.add("animout");
+  setTimeout(() => {
+    const cards = getDeckCards(state.activeDeck);
+    state.cardIdx = (state.cardIdx + dir + cards.length) % cards.length;
+    state.flipped = false;
+    renderStudy();
+    fc.classList.remove("animout");
+  }, 230);
+}
+
+function markGot() { state.score.got++; showToast("✅ Got it!"); navigate(1); }
+function markLearning() { state.score.review++; showToast("📌 Marked for review"); navigate(1); }
+
+// ─── MANAGE ──────────────────────────────────────────────────────────────────
+function renderManage() {
+  // filter row
+  const fr = document.getElementById("filter-row");
+  fr.innerHTML = "";
+  const allBtn = document.createElement("button");
+  allBtn.className = "filter-btn" + (state.filterDeck === null ? " active" : "");
+  allBtn.textContent = "All Custom";
+  allBtn.onclick = () => { state.filterDeck = null; renderManage(); };
+  fr.appendChild(allBtn);
+  DECK_KEYS.forEach(k => {
+    const count = (state.customCards[k] || []).length;
+    if (count === 0) return;
+    const d = DECKS_DATA[k];
+    const btn = document.createElement("button");
+    btn.className = "filter-btn" + (state.filterDeck === k ? " active" : "");
+    btn.style.color = state.filterDeck === k ? "#000" : d.color;
+    btn.style.borderColor = state.filterDeck === k ? d.color : "#1a1c2e";
+    btn.style.background = state.filterDeck === k ? d.color : "transparent";
+    btn.textContent = `${d.emoji} ${d.label} (${count})`;
+    btn.onclick = () => { state.filterDeck = k; renderManage(); };
+    fr.appendChild(btn);
+  });
+
+  // cards list
+  const wrap = document.getElementById("cards-list-wrap");
+  const keysToShow = state.filterDeck ? [state.filterDeck] : DECK_KEYS;
+  let html = '<div class="cards-list">';
+  let count = 0;
+  keysToShow.forEach(key => {
+    (state.customCards[key] || []).forEach((card, i) => {
+      count++;
+      const d = DECKS_DATA[key];
+      html += `<div class="card-row">
+        <div class="card-row-content">
+          <div class="card-row-q" style="color:${d.color}">Q: ${card.q}</div>
+          <div class="card-row-a">A: ${card.a}</div>
+          <div class="card-row-deck">${d.emoji} ${d.label}</div>
+        </div>
+        <div class="card-row-btns">
+          <button class="edit-btn" onclick="openForm('${key}',${i})">Edit</button>
+          <button class="del-btn" onclick="deleteCard('${key}',${i})">Del</button>
+        </div>
+      </div>`;
+    });
+  });
+  html += "</div>";
+  if (count === 0) {
+    html = `<div class="empty-state"><div class="empty-icon">📭</div><p style="font-style:italic;font-size:14px">No custom cards yet. Add your own!</p></div>`;
+  }
+  wrap.innerHTML = html;
+}
+
+function deleteCard(key, idx) {
+  state.customCards[key].splice(idx, 1);
+  showToast("🗑️ Deleted");
+  renderManage();
+}
+
+// ─── FORM ─────────────────────────────────────────────────────────────────────
+function openForm(deckKey, idx) {
+  state.formEditDeckKey = deckKey;
+  state.formEditIdx = idx;
+  state.formDeck = deckKey || DECK_KEYS[0];
+  document.getElementById("form-title").textContent = idx !== null ? "Edit Card" : "New Card";
+  document.getElementById("form-q").value = idx !== null ? state.customCards[deckKey][idx].q : "";
+  document.getElementById("form-a").value = idx !== null ? state.customCards[deckKey][idx].a : "";
+  renderDeckSelectRow();
+  goScreen("form");
+  document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+}
+
+function renderDeckSelectRow() {
+  const row = document.getElementById("deck-select-row");
+  row.innerHTML = "";
+  DECK_KEYS.forEach(k => {
+    const d = DECKS_DATA[k];
+    const isSel = state.formDeck === k;
+    const btn = document.createElement("button");
+    btn.className = "deck-sel-btn";
+    btn.style.color = isSel ? d.color : "#444";
+    btn.style.borderColor = isSel ? d.color : "#1a1c2e";
+    btn.style.background = isSel ? `${d.color}25` : "transparent";
+    btn.textContent = `${d.emoji} ${d.label}`;
+    btn.onclick = () => { state.formDeck = k; renderDeckSelectRow(); };
+    row.appendChild(btn);
+  });
+}
+
+function saveCard() {
+  const q = document.getElementById("form-q").value.trim();
+  const a = document.getElementById("form-a").value.trim();
+  if (!q || !a) { showToast("⚠️ Please fill in both fields"); return; }
+  const key = state.formDeck;
+  if (!state.customCards[key]) state.customCards[key] = [];
+  if (state.formEditIdx !== null && state.formEditDeckKey === key) {
+    state.customCards[key][state.formEditIdx] = { q, a };
+    showToast("✏️ Card updated!");
+  } else {
+    state.customCards[key].push({ q, a });
+    showToast("➕ Card added!");
+  }
+  goScreen("manage");
+}
+
+// ─── BOOT ─────────────────────────────────────────────────────────────────────
+renderHome();
+</script>
+</body>
+</html>
+
